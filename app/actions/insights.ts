@@ -38,7 +38,8 @@ Respond with ONLY the insight text. No labels, no preamble, no bullet points.`
 
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama3-8b-8192',
+      // llama3-8b-8192 was decommissioned on Groq; use a current supported model.
+      model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 150,
       temperature: 0.6,

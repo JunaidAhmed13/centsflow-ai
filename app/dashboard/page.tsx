@@ -1,13 +1,18 @@
+import { Suspense } from 'react'
 import { getDashboardMetrics } from '@/app/actions/expenses'
-import { getSpendingInsight } from '@/app/actions/insights'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { CategoryChart } from '@/components/dashboard/CategoryChart'
 import { TrendChart } from '@/components/dashboard/TrendChart'
 import { TransactionsTable } from '@/components/dashboard/TransactionsTable'
-import { AIInsightCard } from '@/components/dashboard/AIInsightCard'
+import { AIInsightSkeleton } from '@/components/dashboard/AIInsightCard'
+import { AsyncInsight } from '@/components/dashboard/AsyncInsight'
+import { RealtimeRefresher } from '@/components/dashboard/RealtimeRefresher'
+import { LiveDateCard } from '@/components/dashboard/LiveDateCard'
 
-export const revalidate = 60
+// Realtime drives freshness now — opt out of ISR caching so router.refresh()
+// always re-runs the server fetch against live Supabase data.
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   searchParams: { month?: string | string[] }
@@ -33,14 +38,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       ? rawMonth
       : currentMonthISO()
 
-  // Fetch metrics once, then derive insight from the result
+  // Fetch metrics once; the AI insight streams in separately via Suspense so a
+  // slow or failing Groq call never blocks the rest of the dashboard.
   const metrics = await getDashboardMetrics(month)
-  const insight = await getSpendingInsight(
-    metrics.totalSpend,
-    metrics.topCategory,
-    metrics.categoryData,
-    metrics.predictedRunRate
-  )
 
   const formatPKR = (value: number) =>
     `PKR ${Math.round(value).toLocaleString('en-US')}`
@@ -50,13 +50,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       ? ((metrics.predictedRunRate - metrics.totalSpend) / metrics.totalSpend) * 100
       : 0
 
-  // ── Today's date for the date card ────────────────────────────────────────
-  const now = new Date()
-  const todayDay = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-  const todayYear = now.getFullYear().toString()
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] transition-colors duration-200">
+      {/* Subscribes to Supabase Realtime and refreshes this route on any DB mutation */}
+      <RealtimeRefresher />
       <DashboardHeader currentMonth={month} />
 
       {/* Full-width main — no max-w constraint, just horizontal padding */}
@@ -65,21 +62,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         {/* ── Top row: date card + page subtitle ─────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
 
-          {/* Date card */}
-          <div
-            className="
-              inline-flex flex-col px-5 py-3.5 rounded-xl border-2 shrink-0
-              bg-indigo-950/60 border-indigo-500/50
-              dark:bg-indigo-950/60 dark:border-indigo-500/50
-            "
-          >
-            <span className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-none">
-              {todayDay}
-            </span>
-            <span className="text-sm text-indigo-300 font-medium mt-1">
-              {todayYear}
-            </span>
-          </div>
+          {/* Date card — live client-side date in the user's timezone */}
+          <LiveDateCard />
 
           {/* Month label + context */}
           <div className="text-right hidden sm:block">
@@ -126,8 +110,15 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           />
         </div>
 
-        {/* ── AI Insight ─────────────────────────────────────────────────── */}
-        <AIInsightCard insight={insight} />
+        {/* ── AI Insight (streamed; shows skeleton while Groq resolves) ──── */}
+        <Suspense fallback={<AIInsightSkeleton />}>
+          <AsyncInsight
+            totalSpend={metrics.totalSpend}
+            topCategory={metrics.topCategory}
+            categoryData={metrics.categoryData}
+            predictedRunRate={metrics.predictedRunRate}
+          />
+        </Suspense>
 
         {/* ── Charts ─────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -138,8 +129,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         {/* ── Transactions table ─────────────────────────────────────────── */}
         <TransactionsTable expenses={metrics.expenses} />
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-700 pb-4">
-          CentsFlow AI · Next.js 14 · Clerk · Supabase · Groq
+        <p className="text-center text-xs text-slate-400 dark:text-slate-600 pb-4">
+          CentsFlow AI may produce inaccurate metrics. Please verify transaction logs independently. Built by JunaidAhmed13.
         </p>
       </main>
     </div>
