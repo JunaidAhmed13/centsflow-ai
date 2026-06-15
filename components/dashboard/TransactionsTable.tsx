@@ -108,11 +108,16 @@ export function TransactionsTable({ expenses: initialExpenses }: TransactionsTab
 
     startTransition(async () => {
       try {
-        await deleteExpense(id)
+        const result = await deleteExpense(id)
+        if (!result.success) {
+          console.error('[Delete] Failed:', result.error)
+          setRows(previous) // rollback on a handled failure
+          return
+        }
         router.refresh() // sync server state
       } catch (err) {
         console.error('[Delete] Failed:', err)
-        setRows(previous) // rollback on failure
+        setRows(previous) // rollback on an unexpected throw
       }
     })
   }

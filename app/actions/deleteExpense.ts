@@ -3,16 +3,36 @@
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function deleteExpense(expenseId: string): Promise<void> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
+export type DeleteResult =
+  | { success: true }
+  | { success: false; error: string }
 
-  const { error } = await supabaseAdmin
-    .from('expenses')
-    .delete()
-    .eq('id', expenseId)
+export async function deleteExpense(expenseId: string): Promise<DeleteResult> {
+  try {
+    const { userId } = await auth()
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' }
+    }
 
-  if (error) {
-    throw new Error(`Failed to delete expense: ${error.message}`)
+    // supabaseAdmin uses the Service Role Key (bypasses RLS). The `id` column
+    // is int8; passing the string id is coerced safely by Supabase.
+    const { error } = await supabaseAdmin
+      .from('expenses')
+      .delete()
+      .eq('id', expenseId)
+
+    if (error) {
+      // Log the full error object so it surfaces in Vercel logs.
+      console.error('[deleteExpense] Supabase delete failed:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[deleteExpense] Unexpected error:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error while deleting expense.',
+    }
   }
 }

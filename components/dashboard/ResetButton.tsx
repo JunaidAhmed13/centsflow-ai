@@ -15,11 +15,14 @@ export function ResetButton() {
     setError(null)
     startTransition(async () => {
       try {
-        const { deleted } = await resetAllExpenses()
+        const result = await resetAllExpenses()
+        if (!result.success) {
+          setError(result.error)
+          return
+        }
         setOpen(false)
         router.refresh()
-        // Brief success flash could go here
-        console.log(`[Reset] Deleted ${deleted} expenses.`)
+        console.log(`[Reset] Deleted ${result.deleted} expenses.`)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong.')
       }
