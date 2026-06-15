@@ -3,7 +3,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import type { Expense, DashboardMetrics, CategoryTotal, DailyTotal } from '@/types'
 
-// Derive ISO date-range boundaries for a given "YYYY-MM" string.
 function monthBounds(month: string): { startISO: string; endISO: string } {
   const [y, m] = month.split('-').map(Number)
   const startISO = `${month}-01T00:00:00.000Z`
@@ -13,10 +12,28 @@ function monthBounds(month: string): { startISO: string; endISO: string } {
   return { startISO, endISO }
 }
 
+// Converts any value to a finite number, returning 0 for NaN/Infinity/null/undefined.
+function safeAmount(value: unknown): number {
+  const n = Number(value)
+  return isFinite(n) ? n : 0
+}
+
+// Normalises a raw Supabase row into a typed Expense, coercing null fields to safe defaults.
+function normaliseRow(row: Record<string, unknown>): Expense {
+  return {
+    id: String(row.id ?? ''),
+    created_at: row.created_at != null ? String(row.created_at) : '',
+    amount: safeAmount(row.amount),
+    currency: row.currency != null ? String(row.currency) : undefined,
+    category: row.category != null ? String(row.category) : 'Other',
+    description: row.description != null ? String(row.description) : '',
+    user_id: row.user_id != null ? String(row.user_id) : '',
+  }
+}
+
 export async function getUserExpenses(month: string): Promise<Expense[]> {
   const { startISO, endISO } = monthBounds(month)
 
-  // Fetches data matching the date boundary regardless of the user_id column value
   const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('*')
@@ -28,7 +45,7 @@ export async function getUserExpenses(month: string): Promise<Expense[]> {
     throw new Error(`Supabase query failed: ${error.message}`)
   }
 
-  return (data as Expense[]) ?? []
+  return ((data ?? []) as Record<string, unknown>[]).map(normaliseRow)
 }
 
 export async function getDashboardMetrics(month: string): Promise<DashboardMetrics> {
@@ -42,12 +59,12 @@ export async function getDashboardMetrics(month: string): Promise<DashboardMetri
   const daysElapsed = isCurrentMonth ? now.getDate() : daysInMonth
 
   // ── Total spend ──────────────────────────────────────────────────────────
-  const totalSpend = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+  const totalSpend = expenses.reduce((sum, e) => sum + safeAmount(e.amount), 0)
 
   // ── Category breakdown ───────────────────────────────────────────────────
   const categoryMap = expenses.reduce<Record<string, number>>((acc, e) => {
-    const categoryName = e.category || 'Other'
-    acc[categoryName] = (acc[categoryName] ?? 0) + Number(e.amount)
+    const cat = e.category || 'Other'
+    acc[cat] = (acc[cat] ?? 0) + safeAmount(e.amount)
     return acc
   }, {})
 
@@ -58,15 +75,14 @@ export async function getDashboardMetrics(month: string): Promise<DashboardMetri
   const topCategory = categoryData[0]?.category ?? null
   const topCategoryAmount = categoryData[0]?.total ?? 0
 
-  // For past months run rate equals actual total.
   const predictedRunRate =
     daysElapsed > 0 ? (totalSpend / daysElapsed) * daysInMonth : totalSpend
 
-  // ── Daily trend for every day in the selected month ──────────────────────
+  // ── Daily trend ──────────────────────────────────────────────────────────
   const dailyMap = expenses.reduce<Record<string, number>>((acc, e) => {
     if (e.created_at) {
       const day = e.created_at.split('T')[0]
-      acc[day] = (acc[day] ?? 0) + Number(e.amount)
+      if (day) acc[day] = (acc[day] ?? 0) + safeAmount(e.amount)
     }
     return acc
   }, {})
