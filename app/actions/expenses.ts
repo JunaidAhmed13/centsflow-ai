@@ -1,6 +1,5 @@
 'use server'
 
-import { auth, currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { Expense, DashboardMetrics, CategoryTotal, DailyTotal } from '@/types'
 
@@ -14,26 +13,13 @@ function monthBounds(month: string): { startISO: string; endISO: string } {
   return { startISO, endISO }
 }
 
-// Returns the verified phone number for the current Clerk user.
-export async function getVerifiedPhone(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized: no active session.')
-
-  const user = await currentUser()
-  const phone = user?.phoneNumbers[0]?.phoneNumber
-  if (!phone) throw new Error('No phone number linked to this account. Please add a phone number in your profile.')
-
-  return phone
-}
-
 export async function getUserExpenses(month: string): Promise<Expense[]> {
-  const phone = await getVerifiedPhone()
   const { startISO, endISO } = monthBounds(month)
 
+  // Fetches data matching the date boundary regardless of the user_id column value
   const { data, error } = await supabaseAdmin
     .from('expenses')
     .select('*')
-    .eq('user_id', phone)
     .gte('created_at', startISO)
     .lt('created_at', endISO)
     .order('created_at', { ascending: false })
@@ -60,7 +46,8 @@ export async function getDashboardMetrics(month: string): Promise<DashboardMetri
 
   // ── Category breakdown ───────────────────────────────────────────────────
   const categoryMap = expenses.reduce<Record<string, number>>((acc, e) => {
-    acc[e.category] = (acc[e.category] ?? 0) + Number(e.amount)
+    const categoryName = e.category || 'Other'
+    acc[categoryName] = (acc[categoryName] ?? 0) + Number(e.amount)
     return acc
   }, {})
 
@@ -77,8 +64,10 @@ export async function getDashboardMetrics(month: string): Promise<DashboardMetri
 
   // ── Daily trend for every day in the selected month ──────────────────────
   const dailyMap = expenses.reduce<Record<string, number>>((acc, e) => {
-    const day = e.created_at.split('T')[0]
-    acc[day] = (acc[day] ?? 0) + Number(e.amount)
+    if (e.created_at) {
+      const day = e.created_at.split('T')[0]
+      acc[day] = (acc[day] ?? 0) + Number(e.amount)
+    }
     return acc
   }, {})
 
