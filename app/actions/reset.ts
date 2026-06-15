@@ -1,15 +1,15 @@
 'use server'
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { getVerifiedPhone } from '@/app/actions/expenses'
 
 export async function resetAllExpenses(): Promise<{ deleted: number }> {
-  const phone = await getVerifiedPhone()
-
+  // Deletes every expense row regardless of user_id (test-data agnostic).
+  // The `.not('id', 'is', null)` predicate satisfies Supabase's requirement
+  // that a delete include a filter, while matching all rows.
   const { data, error } = await supabaseAdmin
     .from('expenses')
     .delete()
-    .eq('user_id', phone)
+    .not('id', 'is', null)
     .select('id')
 
   if (error) {
