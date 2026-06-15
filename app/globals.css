@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Light mode defaults ─────────────────────────────────────────────────── */
+:root {
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --border: #e2e8f0;
+}
+
+/* ── Dark mode overrides ─────────────────────────────────────────────────── */
+.dark {
+  --bg-page: #0B0F19;
+  --bg-surface: #0F1523;
+  --border: #1e293b;
+}
+
+html,
+body {
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Thin scrollbar in dark mode; subtle in light */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.dark * {
+  scrollbar-color: #334155 transparent;
+}
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+.dark *::-webkit-scrollbar-thumb { background-color: #334155; }
