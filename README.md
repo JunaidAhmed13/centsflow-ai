@@ -80,28 +80,6 @@ The n8n system processes data variables and targets the Supabase insert instance
 
 ---
 
-## 🚀 Environment Blueprint & Production Variables
-
-Configure a clean `.env.local` resource in your project root using these parameter frameworks:
-
-```env
-# 🔐 Clerk Authentication Interface Configuration
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_********************************
-CLERK_SECRET_KEY=sk_live_********************************
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-
-# 🗄️ Supabase System Infrastructure Routing
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# 🧠 Core Inference Engine Execution Authorization
-GROQ_API_KEY=gsk_************************************
-```
-
----
-
 ## 🧑‍💻 Author
 
 Developed and maintained by **[JunaidAhmed13](https://github.com/JunaidAhmed13)**.
